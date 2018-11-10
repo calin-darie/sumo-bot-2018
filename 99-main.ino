@@ -1,6 +1,3 @@
-#define IN_LIGHT_REARLEFT 0
-#define IN_LIGHT_REARRIGHT 4 
-  
 led yellowLed(11);
 led redLed(12);
 led greenLed(13);
@@ -8,6 +5,14 @@ led greenLed(13);
 analogReader proximityRaw(A5);
 opponentVisibilityInterpreter opponentVisibility;
 smoothInput proximity(proximityRaw, opponentVisibility, 50);
+
+analogReader lightRearLeftRaw(A0);
+opponentContactRearInterpreter opponentContactRearLeft;
+smoothInput lightRearLeft(lightRearLeftRaw, opponentContactRearLeft, 30);
+
+analogReader lightRearRightRaw(A4);
+opponentContactRearInterpreter opponentContactRearRight;
+smoothInput lightRearRight(lightRearRightRaw, opponentContactRearRight, 30);
   
 reflectanceReader reflectanceLeftRaw(0);
 surfaceInterpreter surfaceLeft;
@@ -52,6 +57,8 @@ public:
   }
   char* getName() {return "fight start"; };
 };
+
+
 class attackBehavior: public behavior {
 public:
   virtual void activate() {
@@ -64,6 +71,37 @@ public:
     return opponentVisibility.getLatest();
   }
   char* getName() {return "attack"; };
+};
+
+class evadeAndCircleBackBehavior: public behavior {
+public:
+  virtual void activate() {
+    behavior::activate();
+    redLed.turnOnBlink();
+    yellowLed.turnOnBlink();
+    greenLed.turnOff();
+  }
+  virtual bool act() {
+    //todo: move motors
+
+    //todo: extract method
+    // confirmLatestValueForPastMilliseconds(T value, 
+    //                                       unsigned long milliseconds)
+    unsigned long now = millis();
+    unsigned long timeItTakesToCompleteManeuver = 4000; //time it takes to turn 306 degrees?
+    //todo: create separate method behavior::shouldContinue
+    bool  shouldContinue = 
+      opponentContactRearLeft.getLatest() || opponentContactRearRight.getLatest() ||
+      now - opponentContactRearLeft.getSince() < timeItTakesToCompleteManeuver ||
+      now - opponentContactRearRight.getSince() < timeItTakesToCompleteManeuver;
+    return shouldContinue;
+  }
+  virtual bool shouldUrgentlyAct() {
+    return 
+      opponentContactRearLeft.getLatest() ||
+      opponentContactRearRight.getLatest();
+  }
+  char* getName() {return "evadeAndCircleBack"; };
 };
 
 class preFightBehavior : public behavior{
@@ -112,6 +150,7 @@ preFightBehavior preFight;
 fightStartBehavior fightStart;
 attackBehavior attack;
 backOffBehavior backOff;
+evadeAndCircleBackBehavior evadeAndCircleBack;
 
 freezeAllMotorFunctionsBehavior freezeAllMotorFunctions;
 
@@ -121,10 +160,15 @@ class fightContext: public context {
     virtual void beforeAct () {
       if (_currentBehavior == &preFight)
         return;
+      //todo: if backOff.sholdUrgentlyAct()
       if (edgeDetected())
         ensureBehavior(backOff);
+      //todo: if attack.sholdUrgentlyAct()
       else if (opponentVisibility.getLatest())
         ensureBehavior(attack);
+      else if (evadeAndCircleBack.shouldUrgentlyAct()) {
+        ensureBehavior(evadeAndCircleBack);
+      }
     }
   
   public:
@@ -192,6 +236,8 @@ void loop() {
   proximity.updateInput();
   reflectanceLeft.updateInput();
   reflectanceRight.updateInput();
+  lightRearLeft.updateInput();
+  lightRearRight.updateInput();
   
   sumoBot.act();
   

@@ -116,6 +116,7 @@ class smoothInput {
     updateInput();
 
     _precision = 1;
+    if (millis() < 6000) return;
     long sumOfSquaredDifferences = 0;
     for (int i = 0; i < numReadings; ++i) {
       int difference = _readings[i] - runningAverage();
