@@ -7,7 +7,7 @@ virtual int read() const;
 
 class iInputInterpreter { 
   public: 
-  virtual void handle(int input);
+  virtual void interpret(int smooth, int raw);
 };
 
 template<typename TOutput>
@@ -16,12 +16,22 @@ class inputInterpreter : public iInputInterpreter{
   TOutput _latestOutput;
   unsigned long _since;
   protected:
-  virtual TOutput convert(int input);
-
+  virtual TOutput convert(int smooth, int raw);
+  virtual char* getName() {return 0;}
   public:
-  void handle(int input) {
-    TOutput currentOutput = convert(input);
+  void interpret(int smooth, int raw) {
+    TOutput currentOutput = convert(smooth, raw);
     if (_latestOutput != currentOutput) {
+      char* name = getName();
+      if (name != 0) {
+        Serial.print(name);
+        Serial.print(": smooth ");
+        Serial.print(smooth);
+        Serial.print(", raw ");
+        Serial.print(raw);
+        Serial.print(" => ");
+        Serial.println(currentOutput);
+      }
       _latestOutput = currentOutput;
       _since = millis();
   }
@@ -73,7 +83,7 @@ class smoothInput {
     if (now - _lastEmitTime < throttleTimeMs) return;
     
     _latestValue = value;
-    _interpreter.handle(roundToPrecision(_latestValue, _precision));
+    _interpreter.interpret(roundToPrecision(_latestValue, _precision), _latestValue);
     _lastEmitTime = now;      
   }
 
