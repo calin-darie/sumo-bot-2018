@@ -5,8 +5,6 @@ led yellowLed(11);
 led redLed(12);
 led greenLed(13);
 
-QTRSensorsRC reflectanceReader::qtrrc((unsigned char[]) { 7, 8 }, NUM_REFLECTANCE_SENSORS, TIMEOUT);
-
 analogReader proximityRaw(A5);
 opponentVisibilityInterpreter opponentVisibility;
 smoothInput proximity(proximityRaw, opponentVisibility, 50);
@@ -18,12 +16,13 @@ smoothInput lightRearLeft(lightRearLeftRaw, opponentContactRearLeft, 30);
 analogReader lightRearRightRaw(A4);
 opponentContactRearInterpreter opponentContactRearRight;
 smoothInput lightRearRight(lightRearRightRaw, opponentContactRearRight, 30);
-  
-reflectanceReader reflectanceLeftRaw(0);
+
+reflectancePairReader reflectancePairRaw((unsigned char[]){7, 8});
+reflectanceReader reflectanceLeftRaw(reflectancePairRaw, 0);
 surfaceInterpreter surfaceLeft;
 smoothInput reflectanceLeft(reflectanceLeftRaw, surfaceLeft, 250);
   
-reflectanceReader reflectanceRightRaw(1);
+reflectanceReader reflectanceRightRaw(reflectancePairRaw, 1);
 surfaceInterpreter surfaceRight;
 smoothInput reflectanceRight(reflectanceRightRaw, surfaceRight, 250);
 
@@ -125,7 +124,7 @@ public:
   char* getName() {return "fight start"; };
 };
 
-
+//todo derive from context
 class attackBehavior: public behavior {
 public:
   virtual void activate() {
