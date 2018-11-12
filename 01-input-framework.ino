@@ -7,7 +7,8 @@ virtual int read() const;
 
 class iInputInterpreter { 
   public: 
-  virtual void interpret(int smooth, int raw);
+  virtual void interpretLatestRawAverage(int value);
+  virtual void interpret(int value);
 };
 
 template<typename TOutput>
@@ -15,33 +16,40 @@ class inputInterpreter : public iInputInterpreter{
   private:
   TOutput _latestOutput;
   unsigned long _since;
+  void setLatestOutput(TOutput value) {
+    if (_latestOutput == value) return;
+
+    char* name = getName();
+    if (name != 0) {
+      Serial.print(name);
+      Serial.print(" value ");
+      Serial.print(value);
+      Serial.print(" => ");
+      Serial.println(value);
+    }
+    _latestOutput = value;
+    _since = millis();  
+  }
   protected:
-  virtual TOutput convert(int smooth, int raw);
+  virtual TOutput convertLatestRawAverage(int value) {return _latestOutput;}
+  virtual TOutput convert(int value) = 0;
   virtual char* getName() {return 0;}
   public:
-  void interpret(int smooth, int raw) {
-    TOutput currentOutput = convert(smooth, raw);
-    if (_latestOutput != currentOutput) {
-      char* name = getName();
-      if (name != 0) {
-        Serial.print(name);
-        Serial.print(": smooth ");
-        Serial.print(smooth);
-        Serial.print(", raw ");
-        Serial.print(raw);
-        Serial.print(" => ");
-        Serial.println(currentOutput);
-      }
-      _latestOutput = currentOutput;
-      _since = millis();
+  void interpret(int smooth) {
+    TOutput currentOutput = convert(smooth);
+    setLatestOutput(currentOutput);
   }
-}
-TOutput getLatest() {
-  return _latestOutput;
-}
-unsigned long getSince() {
-  return _since;
-}
+  void interpretLatestRawAverage(int value) {
+    TOutput currentOutput = convertLatestRawAverage(value);
+    setLatestOutput(currentOutput);
+  }
+
+  TOutput getLatest() {
+    return _latestOutput;
+  }
+  unsigned long getSince() {
+    return _since;
+  }
 };
 
 class smoothInput {
@@ -78,12 +86,13 @@ class smoothInput {
   }
 
   void setLatestValue(int value) {
-    if (abs(_latestValue - value) < _precision/2) return;
+    _interpreter.interpretLatestRawAverage(value);
+    if (abs(_latestValue - value) < _precision/2) { return; }
     unsigned long now = millis();
     if (now - _lastEmitTime < throttleTimeMs) return;
     
     _latestValue = value;
-    _interpreter.interpret(roundToPrecision(_latestValue, _precision), _latestValue);
+    _interpreter.interpret(roundToPrecision(_latestValue, _precision));
     _lastEmitTime = now;      
   }
 
@@ -112,7 +121,7 @@ class smoothInput {
   }
 
 
-  int calibratePrecision() {//todo: move to its own class?
+  int calibratePrecision() {//todo: move to its own interpreter class?
     updateInput();
 
     _precision = 1;

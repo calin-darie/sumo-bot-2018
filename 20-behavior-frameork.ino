@@ -12,7 +12,7 @@ class behavior {
   
 class justSitThereBehavior : public behavior{
   public:
-  virtual bool act() {}
+  virtual bool act() {return false;}
   char* getName() {return "no op"; };
 } justSitThere;
 
@@ -21,7 +21,12 @@ protected:
   behavior* _currentBehavior;
   behavior* _defaultBehavior;
   virtual void beforeAct() {}
-  virtual bool afterAct() {}
+  virtual bool afterAct(bool currentBehaviorWantsToContinue) {
+    if (!currentBehaviorWantsToContinue) {
+      ensureBehavior(*_defaultBehavior);
+    }
+    return true;
+  }
   void transitionTo(behavior& newBehavior) {
     Serial.print("transition to: ");
     Serial.println(newBehavior.getName());
@@ -40,14 +45,51 @@ public:
   virtual bool act() {
     beforeAct();
     bool shouldKeepCurrentBehavior = _currentBehavior->act();
-    //todo move this if to after afterAct
-    if (!shouldKeepCurrentBehavior) {
-      ensureBehavior(*_defaultBehavior);
-    }
-    return afterAct();
+    return afterAct(shouldKeepCurrentBehavior);
   }
   void ensureBehavior(behavior& newBehavior) {
     if (&newBehavior == _currentBehavior) return;
     transitionTo(newBehavior);
+  }
+};
+
+class behaviorSequence: public context {
+  private:
+  int _currentBehaviorIndex;
+  bool _done;
+  bool activateCurrentBehavior() {
+    behavior* newBehavior = _behaviors[_currentBehaviorIndex];
+    if (newBehavior == NULL) {
+      Serial.print("current behavior sequence done");
+      _done = true;
+      return false;
+    }
+    transitionTo(*newBehavior);
+    return true;
+  }
+  protected:
+  behavior* _behaviors[10];
+  virtual bool afterAct(bool currentBehaviorWantsToContinue) {
+    if (_done) 
+      return false;
+
+    if (currentBehaviorWantsToContinue) 
+      return true;
+
+    ++ _currentBehaviorIndex;
+    Serial.print(" xxx ");
+    Serial.println(_currentBehaviorIndex);
+    return activateCurrentBehavior();
+  }
+  public: 
+  behaviorSequence(){
+    _behaviors[0] = NULL;
+  }
+  virtual void activate () {
+    _done = false;
+    _currentBehaviorIndex = 0;
+    
+    context::activate();
+    activateCurrentBehavior();
   }
 };

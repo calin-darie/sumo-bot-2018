@@ -2,10 +2,10 @@
 
 class reflectanceReader: public reader {
   private: 
-  static const int NUM_SENSORS = 2;
+  static const int NUM_REFLECTANCE_SENSORS = 2;
   static const int TIMEOUT = 2500;
   static QTRSensorsRC qtrrc;
-  static unsigned int sensorValues[NUM_SENSORS];
+  static unsigned int sensorValues[NUM_REFLECTANCE_SENSORS];
   int _sensorIndex;
   
   public: 
@@ -18,5 +18,5 @@ class reflectanceReader: public reader {
     return sensorValues[_sensorIndex];
   }
 };
-QTRSensorsRC reflectanceReader::qtrrc((unsigned char[]) { 7, 8 }, NUM_SENSORS, TIMEOUT);
-unsigned int reflectanceReader::sensorValues[NUM_SENSORS];
+//todo: how to avoid double read?
+unsigned int reflectanceReader::sensorValues[NUM_REFLECTANCE_SENSORS];

@@ -1,7 +1,12 @@
+motor rightMotor(6, 9);
+motor leftMotor(3, 5);
+
 led yellowLed(11);
 led redLed(12);
 led greenLed(13);
- 
+
+QTRSensorsRC reflectanceReader::qtrrc((unsigned char[]) { 7, 8 }, NUM_REFLECTANCE_SENSORS, TIMEOUT);
+
 analogReader proximityRaw(A5);
 opponentVisibilityInterpreter opponentVisibility;
 smoothInput proximity(proximityRaw, opponentVisibility, 50);
@@ -24,8 +29,56 @@ smoothInput reflectanceRight(reflectanceRightRaw, surfaceRight, 250);
 
 bool edgeDetected() {
   return surfaceLeft.getLatest() == SURFACE_EDGE || 
-          surfaceRight.getLatest() == SURFACE_EDGE;
+         surfaceRight.getLatest() == SURFACE_EDGE;
 }
+
+class turnBehavior: public behavior {
+  private:
+  int _speed;
+  int _angleDegrees;
+  static const unsigned long millisecondsToComplete360Turn = 8000;
+  public :
+  turnBehavior(int speed, int angleDegrees):
+    _speed(speed),
+    _angleDegrees(angleDegrees)
+  {}
+  virtual void activate() {
+    behavior::activate();
+    int leftSpeedSign = _angleDegrees > 0? -1 : 1;
+    int leftSpeed = leftSpeedSign * _speed;
+    int rightSpeed = -leftSpeed;
+    leftMotor.setSpeed(leftSpeed);
+    rightMotor.setSpeed(rightSpeed);
+  }
+  virtual bool act() {
+    return millis() - _since < 
+      millisecondsToComplete360Turn * abs(_angleDegrees) / 360;
+  }
+  char* getName() {return "quick turn"; }
+};
+
+class scanBehavior: public behaviorSequence {
+   turnBehavior quick360DegreeTurnRight;
+   turnBehavior quick360DegreeTurnLeft;
+  public: 
+   scanBehavior(int angleDegrees):
+     quick360DegreeTurnRight(motor::MAX_SPEED, -angleDegrees),
+     quick360DegreeTurnLeft(motor::MAX_SPEED, angleDegrees){
+    _behaviors[0] = (behavior*)(&quick360DegreeTurnRight);
+    _behaviors[1] = (behavior*)(&quick360DegreeTurnLeft);
+    _behaviors[2] = NULL;
+  }
+  virtual void activate () {
+    greenLed.turnOn();
+    yellowLed.turnOff();
+    redLed.turnOff();
+    behaviorSequence::activate();
+  }
+  char* getName() {return "scan"; }
+};
+
+scanBehavior wideScan(360);
+scanBehavior narrowScan(20);
 
 class backOffBehavior: public behavior {
 public:
@@ -35,11 +88,26 @@ public:
     redLed.turnOff();
   }
   virtual bool act() {
-    //todo: move motors slightly out of sync to correct the position in case the bot is not perpendicular to the edge, otherwise full speed behind
     unsigned long now = millis();
+    if (surfaceRight.getLatest() == SURFACE_RING && 
+      (surfaceLeft.getLatest() == SURFACE_EDGE ||
+       (surfaceLeft.getSince() < surfaceRight.getSince() && (now - surfaceLeft.getSince() < 1000)))
+    ) {
+      leftMotor.setSpeed(-motor::MAX_SPEED);
+      rightMotor.setSpeed(-motor::MAX_SPEED * 0.75);
+    } else if (surfaceLeft.getLatest() == SURFACE_RING && 
+      (surfaceRight.getLatest() == SURFACE_EDGE ||
+       (surfaceRight.getSince() < surfaceLeft.getSince() && (now - surfaceRight.getSince() < 1000)))
+    ) {
+      rightMotor.setSpeed(-motor::MAX_SPEED);
+      leftMotor.setSpeed(-motor::MAX_SPEED * 0.75);
+    } else {
+      leftMotor.setSpeed(-motor::MAX_SPEED);
+      rightMotor.setSpeed(-motor::MAX_SPEED);
+    }
     return edgeDetected() ||
-        now - surfaceLeft.getSince() < 2500 ||
-        now - surfaceRight.getSince() < 2500;
+        now - surfaceLeft.getSince() < 3000 ||
+        now - surfaceRight.getSince() < 3000;
   }
   char* getName() {return "back off"; };
 };
@@ -52,8 +120,7 @@ public:
     redLed.turnOff();
   }
   virtual bool act() {
-    //todo: move motors
-    return millis() - _since < 5000;
+    return false;
   }
   char* getName() {return "fight start"; };
 };
@@ -65,30 +132,48 @@ public:
     behavior::activate();
     redLed.turnOn();
     yellowLed.turnOff();
+    greenLed.turnOff();
   }
   virtual bool act() {
-    //todo: move motors
+    //todo fight context
+    leftMotor.setSpeed(motor::MAX_SPEED);
+    rightMotor.setSpeed(motor::MAX_SPEED);
     return opponentVisibility.getLatest();
   }
   char* getName() {return "attack"; };
 };
 
+//todo derive from context
 class evadeAndCircleBackBehavior: public behavior {
-public:
+  private:
+  turnBehavior quickTurnRight;
+  turnBehavior quickTurnLeft;
+  behavior* _currentBehavior;
+  public:
   virtual void activate() {
     behavior::activate();
     redLed.turnOnBlink();
     yellowLed.turnOnBlink();
     greenLed.turnOff();
+    
+    _currentBehavior = opponentContactRearRight.getLatest() ? 
+      &quickTurnLeft :
+      &quickTurnRight;
+    _currentBehavior->activate();
+  }
+
+  evadeAndCircleBackBehavior():
+    quickTurnRight(motor::MAX_SPEED, -360),
+    quickTurnLeft(motor::MAX_SPEED, 360){
+      _currentBehavior = &justSitThere;
   }
   virtual bool act() {
-    //todo: move motors
-
+    _currentBehavior->act();
     //todo: extract method
     // confirmLatestValueForPastMilliseconds(T value, 
     //                                       unsigned long milliseconds)
     unsigned long now = millis();
-    unsigned long timeItTakesToCompleteManeuver = 4000; //time it takes to turn 306 degrees?
+    unsigned long timeItTakesToCompleteManeuver = 10000; //time it takes to turn 306 degrees?
     //todo: create separate method behavior::shouldContinue
     bool  shouldContinue = 
       opponentContactRearLeft.getLatest() || opponentContactRearRight.getLatest() ||
@@ -111,6 +196,8 @@ public:
     yellowLed.turnOnBlink();
     redLed.turnOnBlink();
     greenLed.turnOnBlink();
+    leftMotor.setSpeed(0);
+    rightMotor.setSpeed(0);
   }
   virtual bool act() { 
     const unsigned long PRE_FIGHT_DELAY = 5000;
@@ -131,7 +218,8 @@ public:
   virtual void activate() {
     _sent = false;
     behavior::activate();
-    //todo: stop all motors
+    leftMotor.setSpeed(0);
+    rightMotor.setSpeed(0);
     redLed.turnOff();
     yellowLed.turnOff();
     greenLed.turnOff();
@@ -173,7 +261,7 @@ class fightContext: public context {
   
   public:
   void activate () {
-    _defaultBehavior = &fightStart;
+    _defaultBehavior = &wideScan;
     context::activate();
     ensureBehavior(preFight);
   }  
@@ -227,6 +315,8 @@ void setup(){
   yellowLed.init();
   redLed.init();
   greenLed.init();
+  leftMotor.init();
+  rightMotor.init();
       
   redLed.turnOnBlink();
   sumoBot.activate();
@@ -241,6 +331,7 @@ void loop() {
   
   sumoBot.act();
   
+  //todo: motors.updateOutput?
   yellowLed.updateOutput();
   redLed.updateOutput();
   greenLed.updateOutput();
