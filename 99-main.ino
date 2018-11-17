@@ -261,8 +261,8 @@ class fightContext: public context {
   public:
   void activate () {
     _defaultBehavior = &wideScan;
-    context::activate();
     ensureBehavior(preFight);
+    behavior::activate();
   }  
   char* getName() {return "fight"; };
 };
@@ -284,8 +284,8 @@ class sumoBotContext : public context{
     virtual void beforeAct () {
       unsigned long now = millis();
       if (
-        (surfaceLeft.getLatest() == SURFACE_EDGE ||
-        surfaceRight.getLatest() == SURFACE_EDGE) && 
+        surfaceLeft.getLatest() == SURFACE_EDGE &&
+        surfaceRight.getLatest() == SURFACE_EDGE && 
         opponentVisibility.getLatest())
       {
         ensureBehavior(debug);
