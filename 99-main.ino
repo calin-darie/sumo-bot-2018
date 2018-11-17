@@ -41,8 +41,8 @@ class turnBehavior: public behavior {
     _speed(speed),
     _angleDegrees(angleDegrees)
   {
-    unsigned long millisecondsToComplete360Turn = 1800 * _speed / 255;
-    _millisecondsToComplete = millisecondsToComplete360Turn * abs(_angleDegrees) / 360;
+    unsigned long millisecondsToComplete360Turn = (unsigned long)1800 * motor::MAX_SPEED / speed;
+    _millisecondsToComplete = millisecondsToComplete360Turn * abs(angleDegrees) / 360;
   }
   virtual void activate() {
     behavior::activate();
@@ -53,7 +53,7 @@ class turnBehavior: public behavior {
   virtual bool act() {
     return millis() - _since < _millisecondsToComplete;
   }
-  char* getName() {return "quick turn"; }
+  char* getName() {return "turn"; }
 };
 
 class scanBehavior: public behaviorSequence {
@@ -142,19 +142,27 @@ public:
   char* getName() {return "fight start"; };
 };
 
-//todo derive from context
 class attackBehavior: public behavior {
+private:
+  int _tieBreakLeftSpeed;
 public:
   virtual void activate() {
     behavior::activate();
-    redLed.turnOn();
     yellowLed.turnOff();
     greenLed.turnOff();
-  }
-  virtual bool act() {
-    //todo fight context
     leftMotor.setSpeed(motor::MAX_SPEED);
     rightMotor.setSpeed(motor::MAX_SPEED);
+    _tieBreakLeftSpeed = random(motor::MAX_SPEED* 0.33, motor::MAX_SPEED);
+  }
+  virtual bool act() {
+    if (millis() - _since > 20000) { 
+      leftMotor.setSpeed(-_tieBreakLeftSpeed);
+      rightMotor.setSpeed(-motor::MAX_SPEED / 2);
+      redLed.turnOnBlink();
+    }
+    else {
+      redLed.turnOn();
+    }
     return opponentVisibility.getLatest();
   }
   char* getName() {return "attack"; };
@@ -271,6 +279,11 @@ class fightContext: public context {
       //todo: if attack.sholdUrgentlyAct()
       else if (opponentVisibility.getLatest())
         ensureBehavior(attack);
+      else if (!opponentVisibility.getLatest() && 
+        millis() - opponentVisibility.getSince() < 200) {
+        ensureBehavior(narrowScan);
+        redLed.turnOn();
+      }
       else if (evadeAndCircleBack.shouldUrgentlyAct()) {
         ensureBehavior(evadeAndCircleBack);
       }
