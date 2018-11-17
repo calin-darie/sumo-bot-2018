@@ -278,7 +278,7 @@ class fightContext: public context {
   
   public:
   void activate () {
-    _defaultBehavior = &wideScan;
+    _defaultBehavior = &wideScanFromUnknownPosition;
     transitionTo(preFight);
     behavior::activate();
   }  
