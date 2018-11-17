@@ -35,23 +35,23 @@ class turnBehavior: public behavior {
   private:
   int _speed;
   int _angleDegrees;
-  static const unsigned long millisecondsToComplete360Turn = 8000;
+  unsigned long _millisecondsToComplete;
   public :
   turnBehavior(int speed, int angleDegrees):
     _speed(speed),
     _angleDegrees(angleDegrees)
-  {}
+  {
+    unsigned long millisecondsToComplete360Turn = 1800 * _speed / 255;
+    _millisecondsToComplete = millisecondsToComplete360Turn * abs(_angleDegrees) / 360;
+  }
   virtual void activate() {
     behavior::activate();
     int leftSpeedSign = _angleDegrees > 0? -1 : 1;
-    int leftSpeed = leftSpeedSign * _speed;
-    int rightSpeed = -leftSpeed;
-    leftMotor.setSpeed(leftSpeed);
-    rightMotor.setSpeed(rightSpeed);
+    leftMotor.setSpeed(leftSpeedSign * _speed);
+    rightMotor.setSpeed(-leftMotor.getSpeed());
   }
   virtual bool act() {
-    return millis() - _since < 
-      millisecondsToComplete360Turn * abs(_angleDegrees) / 360;
+    return millis() - _since < _millisecondsToComplete;
   }
   char* getName() {return "quick turn"; }
 };
@@ -60,9 +60,9 @@ class scanBehavior: public behaviorSequence {
    turnBehavior quick360DegreeTurnRight;
    turnBehavior quick360DegreeTurnLeft;
   public: 
-   scanBehavior(int angleDegrees):
-     quick360DegreeTurnRight(motor::MAX_SPEED, -angleDegrees),
-     quick360DegreeTurnLeft(motor::MAX_SPEED, angleDegrees){
+   scanBehavior(int angleDegrees, int speed = motor::MAX_SPEED):
+     quick360DegreeTurnRight(speed, -angleDegrees),
+     quick360DegreeTurnLeft(speed, angleDegrees){
     _behaviors[0] = (behavior*)(&quick360DegreeTurnRight);
     _behaviors[1] = (behavior*)(&quick360DegreeTurnLeft);
     _behaviors[2] = NULL;
@@ -71,12 +71,20 @@ class scanBehavior: public behaviorSequence {
     greenLed.turnOn();
     yellowLed.turnOff();
     redLed.turnOff();
+    if (leftMotor.getSpeed() < rightMotor.getSpeed()){
+      _behaviors[0] = (behavior*)(&quick360DegreeTurnLeft);
+      _behaviors[1] = (behavior*)(&quick360DegreeTurnRight);
+    }
+    else {
+      _behaviors[0] = (behavior*)(&quick360DegreeTurnRight);
+      _behaviors[1] = (behavior*)(&quick360DegreeTurnLeft);
+    }
     behaviorSequence::activate();
   }
   char* getName() {return "scan"; }
 };
 
-scanBehavior wideScan(360);
+scanBehavior wideScanFromUnknownPosition(360, motor::MAX_SPEED* 0.4);
 scanBehavior narrowScan(20);
 
 class backOffBehavior: public behavior {
@@ -85,28 +93,34 @@ public:
     behavior::activate();
     yellowLed.turnOnBlink();
     redLed.turnOff();
+
+    if (surfaceRight.getLatest() == SURFACE_RING && 
+      (surfaceLeft.getLatest() == SURFACE_EDGE ||
+        surfaceRight.getSince() - surfaceLeft.getSince() > 250)
+    ) {
+      leftMotor.setSpeed(-motor::MAX_SPEED);
+      rightMotor.setSpeed(-motor::MAX_SPEED * 0.5);
+    } else if (surfaceLeft.getLatest() == SURFACE_RING && 
+      (surfaceRight.getLatest() == SURFACE_EDGE ||
+       surfaceLeft.getSince() - surfaceRight.getSince() > 250)
+    ) {
+      rightMotor.setSpeed(-motor::MAX_SPEED);
+      leftMotor.setSpeed(-motor::MAX_SPEED * 0.5);
+    }
   }
   virtual bool act() {
     unsigned long now = millis();
     if (surfaceRight.getLatest() == SURFACE_RING && 
-      (surfaceLeft.getLatest() == SURFACE_EDGE ||
-       (surfaceLeft.getSince() < surfaceRight.getSince() && (now - surfaceLeft.getSince() < 1000)))
-    ) {
-      leftMotor.setSpeed(-motor::MAX_SPEED);
-      rightMotor.setSpeed(-motor::MAX_SPEED * 0.75);
-    } else if (surfaceLeft.getLatest() == SURFACE_RING && 
-      (surfaceRight.getLatest() == SURFACE_EDGE ||
-       (surfaceRight.getSince() < surfaceLeft.getSince() && (now - surfaceRight.getSince() < 1000)))
-    ) {
-      rightMotor.setSpeed(-motor::MAX_SPEED);
-      leftMotor.setSpeed(-motor::MAX_SPEED * 0.75);
-    } else {
+      surfaceLeft.getLatest() == SURFACE_RING &&
+      now - surfaceLeft.getSince() > 150 &&
+      now - surfaceRight.getSince() > 150) {
       leftMotor.setSpeed(-motor::MAX_SPEED);
       rightMotor.setSpeed(-motor::MAX_SPEED);
     }
+    unsigned long _millisecondsToBackOffAfterGettingOnRing = 850;
     return edgeDetected() ||
-        now - surfaceLeft.getSince() < 3000 ||
-        now - surfaceRight.getSince() < 3000;
+        now - surfaceLeft.getSince() < _millisecondsToBackOffAfterGettingOnRing ||
+        now - surfaceRight.getSince() < _millisecondsToBackOffAfterGettingOnRing;
   }
   char* getName() {return "back off"; };
 };
@@ -117,9 +131,13 @@ public:
     behavior::activate();
     yellowLed.turnOn();
     redLed.turnOff();
+    randomSeed(millis());
+    bool turnRight = (random(2) == 0);
+    rightMotor.setSpeed(turnRight? 0: motor::MAX_SPEED);
+    leftMotor.setSpeed(turnRight? motor::MAX_SPEED: 0);
   }
   virtual bool act() {
-    return false;
+    return millis() - _since < 1000;
   }
   char* getName() {return "fight start"; };
 };
@@ -261,7 +279,7 @@ class fightContext: public context {
   public:
   void activate () {
     _defaultBehavior = &wideScan;
-    ensureBehavior(preFight);
+    transitionTo(preFight);
     behavior::activate();
   }  
   char* getName() {return "fight"; };

@@ -2,6 +2,7 @@ class motor {
   private:
   int _pin1;
   int _pin2;
+  int _speed;
 
   public:
   static const int MAX_SPEED = 255;
@@ -15,6 +16,7 @@ class motor {
     pinMode(_pin2, OUTPUT);
   }
   void setSpeed(int speed) {
+    _speed = speed;
     if (speed < 0) {
       analogWrite(_pin1, -speed);
       analogWrite(_pin2, 0);
@@ -23,5 +25,8 @@ class motor {
       analogWrite(_pin1, 0);
       analogWrite(_pin2, speed);
     }
+  }
+  int getSpeed() {
+    return _speed;
   }
 };

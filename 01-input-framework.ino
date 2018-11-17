@@ -17,15 +17,6 @@ class inputInterpreter : public iInputInterpreter{
   unsigned long _since;
   void setLatestOutput(TOutput value) {
     if (_latestOutput == value) return;
-
-    char* name = getName();
-    if (name != 0) {
-      Serial.print(name);
-      Serial.print(" value ");
-      Serial.print(value);
-      Serial.print(" => ");
-      Serial.println(value);
-    }
     _latestOutput = value;
     _since = millis();  
   }
@@ -33,8 +24,18 @@ class inputInterpreter : public iInputInterpreter{
   virtual TOutput convert(int value) = 0;
   virtual char* getName() {return 0;}
   public:
-  void interpret(int smooth) {
-    TOutput currentOutput = convert(smooth);
+  void interpret(int input) {
+    TOutput currentOutput = convert(input);
+    if (currentOutput != _latestOutput) {
+      char* name = getName();
+      if (name != 0) {
+        Serial.print(name);
+        Serial.print(" value ");
+        Serial.print(input);
+        Serial.print(" => ");
+        Serial.println(currentOutput);
+      }
+    }
     setLatestOutput(currentOutput);
   }
   
