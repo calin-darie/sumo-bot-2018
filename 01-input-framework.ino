@@ -7,7 +7,6 @@ virtual int read() const;
 
 class iInputInterpreter { 
   public: 
-  virtual void interpretLatestRawAverage(int value);
   virtual void interpret(int value);
 };
 
@@ -31,7 +30,6 @@ class inputInterpreter : public iInputInterpreter{
     _since = millis();  
   }
   protected:
-  virtual TOutput convertLatestRawAverage(int value) {return _latestOutput;}
   virtual TOutput convert(int value) = 0;
   virtual char* getName() {return 0;}
   public:
@@ -39,11 +37,7 @@ class inputInterpreter : public iInputInterpreter{
     TOutput currentOutput = convert(smooth);
     setLatestOutput(currentOutput);
   }
-  void interpretLatestRawAverage(int value) {
-    TOutput currentOutput = convertLatestRawAverage(value);
-    setLatestOutput(currentOutput);
-  }
-
+  
   TOutput getLatest() {
     return _latestOutput;
   }
@@ -86,7 +80,6 @@ class smoothInput {
   }
 
   void setLatestValue(int value) {
-    _interpreter.interpretLatestRawAverage(value);
     if (abs(_latestValue - value) < _precision/2) { return; }
     unsigned long now = millis();
     if (now - _lastEmitTime < throttleTimeMs) return;

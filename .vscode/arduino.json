@@ -1,5 +1,5 @@
 {
     "sketch": "sumo-bot-2018.ino",
     "board": "arduino:avr:uno",
-    "port": "COM5"
+    "port": "COM3"
 }

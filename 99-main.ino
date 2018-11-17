@@ -284,15 +284,16 @@ class sumoBotContext : public context{
     virtual void beforeAct () {
       unsigned long now = millis();
       if (
-        surfaceLeft.getLatest() == SURFACE_NONE ||
-        surfaceRight.getLatest() == SURFACE_NONE)
+        (surfaceLeft.getLatest() == SURFACE_EDGE ||
+        surfaceRight.getLatest() == SURFACE_EDGE) && 
+        opponentVisibility.getLatest())
       {
         ensureBehavior(debug);
       } else if (
         surfaceLeft.getLatest() == SURFACE_RING &&
         surfaceRight.getLatest() == SURFACE_RING && 
-        now - surfaceLeft.getSince() > 500 && 
-        now - surfaceRight.getSince() > 500)
+        now - surfaceLeft.getSince() >= 150 && 
+        now - surfaceRight.getSince() >= 150)
       {
           ensureBehavior(fight);
       }
