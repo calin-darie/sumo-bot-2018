@@ -26,16 +26,6 @@ class inputInterpreter : public iInputInterpreter{
   public:
   void interpret(int input) {
     TOutput currentOutput = convert(input);
-    if (currentOutput != _latestOutput) {
-      char* name = getName();
-      if (name != 0) {
-        Serial.print(name);
-        Serial.print(" value ");
-        Serial.print(input);
-        Serial.print(" => ");
-        Serial.println(currentOutput);
-      }
-    }
     setLatestOutput(currentOutput);
   }
   
@@ -129,7 +119,6 @@ class smoothInput {
     int proposedPrecision = 2* deviation;
     if (proposedPrecision > _maxProposedPrecision) {
       _maxProposedPrecision = proposedPrecision;
-      Serial.println(_maxProposedPrecision);
     }
   }
 };

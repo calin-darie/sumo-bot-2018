@@ -28,8 +28,6 @@ protected:
     return true;
   }
   void transitionTo(behavior& newBehavior) {
-    Serial.print("transition to: ");
-    Serial.println(newBehavior.getName());
     _currentBehavior = &newBehavior;
     newBehavior.activate();
   }
@@ -60,7 +58,6 @@ class behaviorSequence: public context {
   bool activateCurrentBehavior() {
     behavior* newBehavior = _behaviors[_currentBehaviorIndex];
     if (newBehavior == NULL) {
-      Serial.print("current behavior sequence done");
       _done = true;
       return false;
     }
@@ -77,8 +74,6 @@ class behaviorSequence: public context {
       return true;
 
     ++ _currentBehaviorIndex;
-    Serial.print(" xxx ");
-    Serial.println(_currentBehaviorIndex);
     return activateCurrentBehavior();
   }
   public: 

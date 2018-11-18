@@ -42,7 +42,8 @@ class turnBehavior: public behavior {
     _angleDegrees(angleDegrees)
   {
     unsigned long millisecondsToComplete360Turn = (unsigned long)1800 * motor::MAX_SPEED / speed;
-    _millisecondsToComplete = millisecondsToComplete360Turn * abs(angleDegrees) / 360;
+    _millisecondsToComplete = motor::MILLISECONDS_TO_SET_SPEED +
+      millisecondsToComplete360Turn * abs(angleDegrees) / 360;
   }
   virtual void activate() {
     behavior::activate();
@@ -250,10 +251,6 @@ public:
     greenLed.turnOff();
   }
   virtual bool act() { 
-    if (!_sent && Serial) {
-      Serial.println("todo send all logs here");
-      _sent = true;
-    }
     return true;
   }
   char* getName() {return "freezeAllMotorFunctions"; };
@@ -342,7 +339,6 @@ class sumoBotContext : public context{
 sumoBotContext sumoBot;
   
 void setup(){
-  Serial.begin(9600);
   yellowLed.init();
   redLed.init();
   greenLed.init();
@@ -362,7 +358,8 @@ void loop() {
   
   sumoBot.act();
   
-  //todo: motors.updateOutput?
+  leftMotor.updateOutput();
+  rightMotor.updateOutput();
   yellowLed.updateOutput();
   redLed.updateOutput();
   greenLed.updateOutput();
